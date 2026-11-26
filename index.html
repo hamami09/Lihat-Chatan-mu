@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C:\WINDOWS\system32\cmd.exe - Root Access</title>
+    <!-- Menggunakan Tailwind CSS untuk tata letak responsif -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Pengaturan tema klasik CMD / Terminal Hacker Neon */
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&display=swap');
+
+        body {
+            background-color: #030704;
+            color: #00ff41;
+            font-family: 'Fira Code', 'Courier New', Courier, monospace;
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        /* Efek garis scanline monitor CRT lama */
+        .crt-overlay {
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.35) 50%
+            ), linear-gradient(
+                90deg,
+                rgba(255, 0, 0, 0.03),
+                rgba(0, 255, 0, 0.01),
+                rgba(0, 0, 255, 0.03)
+            );
+            background-size: 100% 3px, 6px 100%;
+            pointer-events: none;
+        }
+
+        /* Efek cahaya teks neon */
+        .neon-text {
+            text-shadow: 0 0 5px rgba(0, 255, 65, 0.7), 0 0 10px rgba(0, 255, 65, 0.3);
+        }
+
+        .neon-red {
+            color: #ff2a2a;
+            text-shadow: 0 0 8px rgba(255, 42, 42, 0.85), 0 0 15px rgba(255, 42, 42, 0.4);
+        }
+
+        /* Animasi kursor berkedip */
+        .cursor-blink {
+            display: inline-block;
+            width: 9px;
+            height: 1.1em;
+            background-color: #00ff41;
+            vertical-align: middle;
+            animation: blink 0.8s infinite;
+        }
+
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
+        /* Animasi kedip untuk peringatan bahaya */
+        @keyframes pulseAlert {
+            0%, 100% { transform: scale(1); border-color: #ff2a2a; }
+            50% { transform: scale(1.01); border-color: #ff8888; }
+        }
+
+        .alert-box {
+            animation: pulseAlert 1s infinite;
+        }
+
+        /* Kustomisasi scrollbar terminal */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #030704;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #008f11;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 sm:p-6 relative">
+
+    <!-- Lapisan Efek Scanline CRT -->
+    <div class="crt-overlay fixed inset-0 z-40"></div>
+
+    <!-- Header ala jendela Windows Command Prompt -->
+    <header class="w-full max-w-5xl mx-auto border border-[#00ff41]/40 bg-[#071209] rounded-t-lg px-3 py-2 flex items-center justify-between text-xs sm:text-sm z-10">
+        <div class="flex items-center space-x-2 truncate">
+            <span class="inline-block w-3 h-3 rounded-full bg-red-500/80"></span>
+            <span class="inline-block w-3 h-3 rounded-full bg-yellow-500/80"></span>
+            <span class="inline-block w-3 h-3 rounded-full bg-green-500/80"></span>
+            <span class="ml-2 font-semibold truncate neon-text">Administrator: C:\WINDOWS\system32\cmd.exe</span>
+        </div>
+        <div class="text-[10px] sm:text-xs text-[#00ff41]/70 hidden sm:block">
+            STATUS: <span id="connStatus" class="text-red-400 font-bold">CONNECTED (SSH-2.0)</span>
+        </div>
+    </header>
+
+    <!-- Area Utama Terminal -->
+    <main id="terminalContainer" class="w-full max-w-5xl mx-auto flex-1 border-x border-b border-[#00ff41]/40 bg-black/90 rounded-b-lg p-3 sm:p-5 overflow-y-auto flex flex-col justify-between z-10 shadow-[0_0_25px_rgba(0,255,65,0.12)]">
+        
+        <!-- Output Log Teks -->
+        <div id="terminalOutput" class="space-y-1.5 text-xs sm:text-sm md:text-base leading-relaxed break-words">
+            <!-- Baris log akan dimasukkan secara dinamis lewat JavaScript -->
+        </div>
+
+        <!-- Baris Kursor Aktif -->
+        <div id="activePrompt" class="mt-2 text-xs sm:text-sm md:text-base neon-text">
+            <span>root@target-device:~# </span><span id="typingCommand"></span><span class="cursor-blink"></span>
+        </div>
+
+        <!-- Area Progress Bar Berbahaya (Muncul saat fase ekstraksi data) -->
+        <div id="progressSection" class="hidden my-5 p-3 sm:p-4 border border-[#00ff41]/60 bg-[#061409] rounded-md">
+            <div class="flex justify-between text-xs sm:text-sm mb-1.5 font-bold">
+                <span id="progressLabel" class="neon-text">EXTRACTING WHATSAPP_DB & GALLERY...</span>
+                <span id="progressPercent" class="neon-text">0%</span>
+            </div>
+            <div class="w-full h-4 sm:h-5 bg-[#020a03] border border-[#00ff41]/50 rounded overflow-hidden p-0.5">
+                <div id="progressBar" class="h-full bg-[#00ff41] transition-all duration-150 shadow-[0_0_10px_#00ff41]" style="width: 0%;"></div>
+            </div>
+            <div id="hexStream" class="mt-2 text-[10px] sm:text-xs text-[#00ff41]/60 truncate font-mono">
+                0x004F8A: 48 65 6C 6C 6F 20 57 6F 72 6C 64 21 00 FF A2 19
+            </div>
+        </div>
+
+        <!-- Kotak Pesan Peringatan Palsu di Akhir -->
+        <div id="finalWarning" class="hidden my-4 p-4 sm:p-6 border-2 border-red-500 bg-[#1a0404] rounded-lg alert-box text-center space-y-3">
+            <div class="text-lg sm:text-2xl font-bold neon-red tracking-wider">
+                [!] PENGUNDUHAN RIWAYAT CHAT WHATSAPP BERHASIL [!]
+            </div>
+            <p class="text-xs sm:text-sm text-red-200 max-w-2xl mx-auto leading-relaxed">
+                Seluruh riwayat chat WhatsApp, galeri foto, dan kontak pada perangkat <span id="deviceInfoText" class="font-bold underline"></span> telah berhasil diunduh ke server jarak jauh.
+            </p>
+            <div class="py-2 px-3 bg-black/70 border border-red-500/40 rounded text-xs text-red-400 font-mono">
+                ID PELACAKAN: #TRG-9981-ID | IP: 192.168.1.104 | STATUS: UPLOAD COMPLETE
+            </div>
+            <div class="pt-2">
+                <button id="revealPrankBtn" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs sm:text-sm font-bold rounded transition cursor-pointer shadow-lg">
+                    BATALKAN & PULIHKAN PERANGKAT SEKARANG
+                </button>
+            </div>
+            <!-- Pesan Klarifikasi Prank (Muncul setelah tombol ditekan) -->
+            <div id="prankRevealText" class="hidden pt-3 border-t border-red-500/30 text-green-400 text-xs sm:text-sm font-semibold">
+                JANGAN PERNAH MEMPERMAINKAN PERASAAN SUAMI - BERTAUBATLAH
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer Info & Tombol Rahasia di Pojok -->
+    <footer class="w-full max-w-5xl mx-auto mt-2 flex items-center justify-between text-[10px] sm:text-xs text-[#00ff41]/50 z-50 px-1">
+        <div>Microsoft Windows [Version 10.0.22631.4460] (c) System Shell</div>
+        
+        <!-- Tombol Rahasia Kecil di Pojok Kanan Bawah untuk Reset / Trigger Ulang -->
+        <div class="flex items-center space-x-2">
+            <button id="secretFastBtn" title="Percepat Simulasi" class="opacity-25 hover:opacity-100 px-2 py-1 border border-[#00ff41]/40 rounded text-[10px] transition cursor-pointer">
+                [FAST]
+            </button>
+            <button id="secretResetBtn" title="Reset / Ulangi Prank" class="opacity-25 hover:opacity-100 px-2 py-1 border border-[#00ff41]/40 rounded text-[10px] transition cursor-pointer">
+                [RESET]
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        // Elemen DOM utama
+        const terminalOutput = document.getElementById('terminalOutput');
+        const typingCommand = document.getElementById('typingCommand');
+        const activePrompt = document.getElementById('activePrompt');
+        const progressSection = document.getElementById('progressSection');
+        const progressBar = document.getElementById('progressBar');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressLabel = document.getElementById('progressLabel');
+        const hexStream = document.getElementById('hexStream');
+        const finalWarning = document.getElementById('finalWarning');
+        const deviceInfoText = document.getElementById('deviceInfoText');
+        const revealPrankBtn = document.getElementById('revealPrankBtn');
+        const prankRevealText = document.getElementById('prankRevealText');
+        const secretResetBtn = document.getElementById('secretResetBtn');
+        const secretFastBtn = document.getElementById('secretFastBtn');
+        const terminalContainer = document.getElementById('terminalContainer');
+
+        // Variabel kontrol animasi
+        let isRunning = false;
+        let speedMultiplier = 1;
+        let activeTimers = [];
+
+        // Deteksi informasi dasar browser/perangkat target agar terlihat nyata
+        function getTargetDeviceInfo() {
+            const ua = navigator.userAgent;
+            let device = "Unknown Device";
+            if (/Android/i.test(ua)) device = "Android Smartphone";
+            else if (/iPhone|iPad|iPod/i.test(ua)) device = "Apple iOS Device";
+            else if (/Windows/i.test(ua)) device = "Windows PC";
+            else if (/Mac/i.test(ua)) device = "MacBook / macOS";
+            else if (/Linux/i.test(ua)) device = "Linux System";
+            return `${device} (${navigator.platform || 'ARM64'})`;
+        }
+
+        // Fungsi helper untuk menjadwalkan timeout yang bisa dibersihkan saat reset
+        function safeTimeout(fn, delay) {
+            const id = setTimeout(fn, delay / speedMultiplier);
+            activeTimers.push(id);
+            return id;
+        }
+
+        // Menambahkan baris teks baru ke layar terminal
+        function appendLine(text, className = "neon-text") {
+            const line = document.createElement('div');
+            line.className = className;
+            line.innerHTML = text;
+            terminalOutput.appendChild(line);
+            terminalContainer.scrollTop = terminalContainer.scrollHeight;
+        }
+
+        // Efek mengetik perintah per karakter
+        function typeCommand(command, callback) {
+            let index = 0;
+            typingCommand.textContent = "";
+            
+            function typeChar() {
+                if (!isRunning) return;
+                if (index < command.length) {
+                    typingCommand.textContent += command.charAt(index);
+                    index++;
+                    safeTimeout(typeChar, 35 + Math.random() * 45);
+                } else {
+                    safeTimeout(() => {
+                        appendLine(`<span class="text-[#00ff41]/70">root@target-device:~#</span> ${command}`);
+                        typingCommand.textContent = "";
+                        if (callback) callback();
+                    }, 250);
+                }
+            }
+            typeChar();
+        }
+
+        // Menghasilkan string hex acak untuk efek pemindaian memori
+        function generateRandomHex() {
+            const chars = "0123456789ABCDEF";
+            let hex = "0x00" + chars[Math.floor(Math.random() * 16)] + chars[Math.floor(Math.random() * 16)] + ": ";
+            for (let i = 0; i < 16; i++) {
+                hex += chars[Math.floor(Math.random() * 16)] + chars[Math.floor(Math.random() * 16)] + " ";
+            }
+            return hex;
+        }
+
+        // Daftar log sistem palsu yang akan muncul berurutan
+        const systemLogs = [
+            { text: "[*] Initializing remote exploit payload v4.9.2...", delay: 400 },
+            { text: `[+] Target identified: <span class="text-yellow-300">${getTargetDeviceInfo()}</span>`, delay: 500 },
+            { text: "[*] Bypassing firewall & local encryption layer...", delay: 600 },
+            { text: "[OK] Port 443 & 8080 open. Root shell granted!", delay: 450, style: "text-cyan-400 font-semibold" },
+            { text: "[*] Scanning directory: /storage/emulated/0/WhatsApp/Databases/", delay: 550 },
+            { text: "[!] Found: msgstore.db.crypt14 (148.4 MB)", delay: 400, style: "text-yellow-400" },
+            { text: "[!] Found: DCIM/Camera_Backup (412 files)", delay: 350, style: "text-yellow-400" },
+            { text: "[*] Injecting background keylogger daemon...", delay: 600 },
+            { text: "[WARN] Antivirus protection disabled remotely.", delay: 450, style: "neon-red font-bold" }
+        ];
+
+        // Menjalankan urutan log satu per satu
+        function runLogs(index, onComplete) {
+            if (!isRunning) return;
+            if (index < systemLogs.length) {
+                const item = systemLogs[index];
+                safeTimeout(() => {
+                    appendLine(item.text, item.style || "neon-text");
+                    runLogs(index + 1, onComplete);
+                }, item.delay);
+            } else {
+                if (onComplete) onComplete();
+            }
+        }
+
+        // Menjalankan animasi progress bar berbahaya
+        function runProgressBar(onComplete) {
+            if (!isRunning) return;
+            progressSection.classList.remove('hidden');
+            let percent = 0;
+
+            function updateProgress() {
+                if (!isRunning) return;
+                percent += Math.floor(Math.random() * 5) + 1;
+                if (percent > 100) percent = 100;
+
+                progressBar.style.width = percent + "%";
+                progressPercent.textContent = percent + "%";
+                hexStream.textContent = generateRandomHex();
+
+                if (percent < 40) {
+                    progressLabel.textContent = "DECRYPTING CHAT DATABASE...";
+                } else if (percent < 75) {
+                    progressLabel.textContent = "UPLOADING PRIVATE MEDIA TO REMOTE SERVER...";
+                    progressBar.classList.replace('bg-[#00ff41]', 'bg-yellow-400');
+                } else {
+                    progressLabel.textContent = "LOCKING DEVICE SYSTEM ACCESS...";
+                    progressBar.classList.replace('bg-yellow-400', 'bg-red-500');
+                }
+
+                terminalContainer.scrollTop = terminalContainer.scrollHeight;
+
+                if (percent < 100) {
+                    safeTimeout(updateProgress, 120);
+                } else {
+                    safeTimeout(() => {
+                        if (onComplete) onComplete();
+                    }, 500);
+                }
+            }
+            updateProgress();
+        }
+
+        // Fungsi utama memulai seluruh rangkaian prank
+        function startPrank() {
+            resetState();
+            isRunning = true;
+            deviceInfoText.textContent = getTargetDeviceInfo();
+
+            appendLine("Microsoft Windows [Version 10.0.22631.4460]", "text-[#00ff41]/70");
+            appendLine("(c) Microsoft Corporation. All rights reserved.\n", "text-[#00ff41]/70");
+
+            safeTimeout(() => {
+                typeCommand("ssh -p 2222 root@target-device --force-bypass", () => {
+                    runLogs(0, () => {
+                        typeCommand("./extract_all.sh --silent --upload", () => {
+                            runProgressBar(() => {
+                                activePrompt.classList.add('hidden');
+                                finalWarning.classList.remove('hidden');
+                                terminalContainer.scrollTop = terminalContainer.scrollHeight;
+                            });
+                        });
+                    });
+                });
+            }, 500);
+        }
+
+        // Membersihkan semua timer dan mengembalikan tampilan ke kondisi awal
+        function resetState() {
+            isRunning = false;
+            speedMultiplier = 1;
+            activeTimers.forEach(id => clearTimeout(id));
+            activeTimers = [];
+
+            terminalOutput.innerHTML = "";
+            typingCommand.textContent = "";
+            activePrompt.classList.remove('hidden');
+            progressSection.classList.add('hidden');
+            finalWarning.classList.add('hidden');
+            prankRevealText.classList.add('hidden');
+
+            progressBar.style.width = "0%";
+            progressBar.classList.remove('bg-yellow-400', 'bg-red-500');
+            progressBar.classList.add('bg-[#00ff41]');
+            progressPercent.textContent = "0%";
+        }
+
+        // Event listener tombol ungkap prank di kotak peringatan akhir
+        revealPrankBtn.addEventListener('click', () => {
+            prankRevealText.classList.remove('hidden');
+            terminalContainer.scrollTop = terminalContainer.scrollHeight;
+        });
+
+        // Event listener tombol rahasia di pojok kanan bawah
+        secretResetBtn.addEventListener('click', () => {
+            startPrank();
+        });
+
+        secretFastBtn.addEventListener('click', () => {
+            speedMultiplier = 4;
+        });
+
+        // Otomatis mulai saat halaman selesai dimuat
+        window.onload = function() {
+            startPrank();
+        };
+    </script>
+</body>
+</html>
